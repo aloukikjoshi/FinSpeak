@@ -1,0 +1,43 @@
+# Core dependencies
+streamlit>=1.28.0
+python-dotenv>=1.0.0
+
+# Audio processing and STT
+openai-whisper>=20230314
+pydub>=0.25.1
+soundfile>=0.12.1
+librosa>=0.10.0
+
+# OpenAI API (optional)
+openai>=1.3.0
+
+# NLP and text processing
+transformers>=4.35.0
+torch>=2.1.0
+rapidfuzz>=3.5.0
+scikit-learn>=1.3.0
+nltk>=3.8.1
+
+# TTS
+gTTS>=2.4.0
+pyttsx3>=2.90
+
+# Data processing
+pandas>=2.1.0
+numpy>=1.24.0
+
+# Testing and evaluation
+pytest>=7.4.0
+pytest-cov>=4.1.0
+jiwer>=3.0.0
+
+# Development
+black>=23.10.0
+flake8>=6.1.0
+mypy>=1.6.0
+jupyter>=1.0.0
+ipykernel>=6.25.0
+
+# Audio recording for Streamlit (browser support)
+streamlit-webrtc>=0.45.0
+av>=10.0.0
