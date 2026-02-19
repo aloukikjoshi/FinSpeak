@@ -14,22 +14,22 @@ load_dotenv()
 class Config:
     """Central configuration for FinSpeak application"""
 
-    # OpenAI API Configuration
-    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
-    USE_OPENAI_STT: bool = os.getenv("USE_OPENAI_STT", "false").lower() == "true"
-    USE_OPENAI_NLU: bool = os.getenv("USE_OPENAI_NLU", "false").lower() == "true"
-
     # Whisper Model Configuration
     # Options: tiny, base, small, medium, large
     WHISPER_MODEL_SIZE: str = os.getenv("WHISPER_MODEL_SIZE", "small")
 
     # NLU Model Configuration
-    NLU_MODEL: str = "google/flan-t5-small"  # Lightweight T5 model
+    # Use a lightweight model compatible with zero-shot-classification pipeline
+    NLU_MODEL: str = "typeform/distilbert-base-uncased-mnli"
     USE_RULE_BASED_NLU: bool = True  # Use rule-based approach as primary
 
     # TTS Configuration
-    TTS_BACKEND: str = "gtts"  # Options: gtts, pyttsx3
+    TTS_BACKEND: str = "gtts"  # Options: gtts, pyttsx3, azure
 
+    # Azure Speech (optional)
+    AZURE_SPEECH_KEY: Optional[str] = os.getenv("AZURE_SPEECH_KEY")
+    AZURE_SPEECH_REGION: Optional[str] = os.getenv("AZURE_SPEECH_REGION")
+    USE_AZURE_SPEECH: bool = os.getenv("USE_AZURE_SPEECH", "false").lower() == "true"
     # Data paths
     DATA_DIR: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
     FUNDS_CSV: str = os.path.join(DATA_DIR, "funds.csv")
@@ -46,26 +46,16 @@ class Config:
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
     @classmethod
-    def get_whisper_model_name(cls) -> str:
-        """Get the full Whisper model name"""
-        return cls.WHISPER_MODEL_SIZE
-
-    @classmethod
-    def use_openai_stt(cls) -> bool:
-        """Check if OpenAI STT should be used"""
-        return cls.USE_OPENAI_STT and cls.OPENAI_API_KEY is not None
-
-    @classmethod
-    def use_openai_nlu(cls) -> bool:
-        """Check if OpenAI NLU should be used"""
-        return cls.USE_OPENAI_NLU and cls.OPENAI_API_KEY is not None
+    def use_azure_speech(cls) -> bool:
+        """Check if Azure Speech should be used"""
+        return cls.USE_AZURE_SPEECH and cls.AZURE_SPEECH_KEY is not None and cls.AZURE_SPEECH_REGION is not None
 
     @classmethod
     def validate(cls) -> bool:
         """Validate configuration"""
-        if cls.USE_OPENAI_STT or cls.USE_OPENAI_NLU:
-            if not cls.OPENAI_API_KEY:
-                print("Warning: OpenAI features enabled but no API key found")
+        if cls.USE_AZURE_SPEECH:
+            if not (cls.AZURE_SPEECH_KEY and cls.AZURE_SPEECH_REGION):
+                print("Warning: Azure Speech enabled but credentials not found")
                 return False
         return True
 

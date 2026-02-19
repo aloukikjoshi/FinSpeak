@@ -14,7 +14,9 @@ from fin_speak.kb import (
     get_fund_info,
     load_funds_data,
     load_nav_data,
+    search_funds,
 )
+from fin_speak.app import generate_answer
 
 
 class TestNLP:
@@ -146,19 +148,26 @@ class TestKB:
 class TestSTT:
     """Tests for STT module"""
     
-    @patch('fin_speak.stt.whisper')
-    def test_transcribe_local_mocked(self, mock_whisper):
+    def test_transcribe_local_mocked(self):
         """Test local transcription (mocked)"""
-        from fin_speak.stt import transcribe_local
+        import sys
         
-        # Mock the whisper model
+        # Create mock whisper module
+        mock_whisper = MagicMock()
         mock_model = MagicMock()
         mock_model.transcribe.return_value = {
             'text': 'What is the current NAV?'
         }
         mock_whisper.load_model.return_value = mock_model
         
-        result = transcribe_local("dummy.wav")
+        # Patch whisper in sys.modules before import
+        with patch.dict(sys.modules, {'whisper': mock_whisper}):
+            # Also mock torch for cuda check
+            mock_torch = MagicMock()
+            mock_torch.cuda.is_available.return_value = False
+            with patch.dict(sys.modules, {'torch': mock_torch}):
+                from fin_speak.stt import transcribe_local
+                result = transcribe_local("dummy.wav")
         
         assert result == 'What is the current NAV?'
         mock_whisper.load_model.assert_called_once()
@@ -168,18 +177,22 @@ class TestSTT:
 class TestTTS:
     """Tests for TTS module"""
     
-    @patch('fin_speak.tts.gTTS')
-    def test_synthesize_gtts_mocked(self, mock_gtts_class):
+    def test_synthesize_gtts_mocked(self):
         """Test gTTS synthesis (mocked)"""
-        from fin_speak.tts import synthesize_gtts
+        import sys
         
-        mock_tts = MagicMock()
-        mock_gtts_class.return_value = mock_tts
+        # Create mock gtts module
+        mock_gtts_module = MagicMock()
+        mock_tts_instance = MagicMock()
+        mock_gtts_module.gTTS.return_value = mock_tts_instance
         
-        synthesize_gtts("Test text", "/tmp/test.mp3")
+        # Patch gtts in sys.modules before import
+        with patch.dict(sys.modules, {'gtts': mock_gtts_module}):
+            from fin_speak.tts import synthesize_gtts
+            synthesize_gtts("Test text", "/tmp/test.mp3")
         
-        mock_gtts_class.assert_called_once()
-        mock_tts.save.assert_called_once_with("/tmp/test.mp3")
+        mock_gtts_module.gTTS.assert_called_once()
+        mock_tts_instance.save.assert_called_once_with("/tmp/test.mp3")
 
 
 class TestIntegration:
@@ -229,6 +242,102 @@ class TestIntegration:
         return_data = compute_return(fund_id, months=6)
         assert return_data is not None
         assert 'percentage_return' in return_data
+
+
+class TestGenerateAnswer:
+    """Tests for answer generation"""
+    
+    def test_generate_answer_nav(self):
+        """Test answer generation for NAV query"""
+        nav_data = {'date': '2026-01-31', 'nav': 79.67}
+        
+        answer = generate_answer(
+            transcript="What is the NAV of Vanguard S&P 500?",
+            intent="get_nav",
+            fund_id="F001",
+            fund_name="Vanguard S&P 500 Index Fund",
+            period_months=None,
+            nav_data=nav_data,
+            return_data=None,
+        )
+        
+        assert "79.67" in answer
+        assert "Vanguard S&P 500 Index Fund" in answer
+        assert "2026-01-31" in answer
+    
+    def test_generate_answer_return(self):
+        """Test answer generation for return query"""
+        return_data = {
+            'percentage_return': 15.5,
+            'absolute_return': 10.23,
+            'start_nav': 66.0,
+            'end_nav': 76.23,
+            'start_date': '2025-01-31',
+            'end_date': '2026-01-31',
+            'period_months': 12.0,
+        }
+        
+        answer = generate_answer(
+            transcript="Show me 12 month returns for Vanguard",
+            intent="get_return",
+            fund_id="F001",
+            fund_name="Vanguard S&P 500 Index Fund",
+            period_months=12,
+            nav_data=None,
+            return_data=return_data,
+        )
+        
+        assert "15.5" in answer or "15.50" in answer
+        assert "gained" in answer
+        assert "Vanguard S&P 500 Index Fund" in answer
+    
+    def test_generate_answer_no_fund(self):
+        """Test answer when fund is not found"""
+        answer = generate_answer(
+            transcript="What is the NAV of Unknown Fund?",
+            intent="get_nav",
+            fund_id=None,
+            fund_name=None,
+            period_months=None,
+        )
+        
+        assert "couldn't identify" in answer.lower()
+    
+    def test_generate_answer_explain(self):
+        """Test answer for explain_change intent"""
+        answer = generate_answer(
+            transcript="Why did the fund change?",
+            intent="explain_change",
+            fund_id="F001",
+            fund_name="Vanguard S&P 500 Index Fund",
+            period_months=None,
+        )
+        
+        assert "performance" in answer.lower() or "analysis" in answer.lower()
+
+
+class TestSearchFunds:
+    """Tests for search_funds function"""
+    
+    def test_search_funds_by_name(self):
+        """Test searching funds by name"""
+        results = search_funds("Vanguard")
+        
+        assert len(results) >= 1
+        assert any("Vanguard" in r['fund_name'] for r in results)
+    
+    def test_search_funds_by_category(self):
+        """Test searching funds by category"""
+        results = search_funds("Equity")
+        
+        assert len(results) >= 1
+        assert all("Equity" in r['category'] for r in results)
+    
+    def test_search_funds_no_match(self):
+        """Test search with no matches"""
+        results = search_funds("NonexistentFundXYZ123")
+        
+        assert len(results) == 0
 
 
 if __name__ == "__main__":

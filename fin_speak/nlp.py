@@ -135,10 +135,10 @@ def detect_intent_ml(transcript: str) -> Dict[str, any]:
     try:
         from transformers import pipeline
         
-        # Use zero-shot classification
+        # Use zero-shot classification with configured model
         classifier = pipeline(
             "zero-shot-classification",
-            model="facebook/bart-large-mnli"
+            model=Config.NLU_MODEL
         )
         
         candidate_labels = [

@@ -66,6 +66,27 @@ def synthesize_pyttsx3(text: str, output_path: str) -> None:
         raise RuntimeError(f"Error synthesizing speech with pyttsx3: {e}") from e
 
 
+def synthesize_azure(text: str, output_path: str) -> None:
+    """
+    Synthesize speech using Azure Cognitive Services Speech SDK
+    """
+    try:
+        import azure.cognitiveservices.speech as speechsdk
+    except ImportError as e:
+        raise ImportError("Azure Speech SDK not installed. Install with: pip install azure-cognitiveservices-speech") from e
+
+    if not Config.AZURE_SPEECH_KEY or not Config.AZURE_SPEECH_REGION:
+        raise ValueError("Azure Speech credentials not found in configuration")
+
+    speech_config = speechsdk.SpeechConfig(subscription=Config.AZURE_SPEECH_KEY, region=Config.AZURE_SPEECH_REGION)
+    audio_config = speechsdk.audio.AudioOutputConfig(filename=output_path)
+    synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
+
+    result = synthesizer.speak_text(text)
+    if result.reason != speechsdk.ResultReason.SynthesizingAudioCompleted:
+        raise RuntimeError(f"Azure TTS failed: {result.reason}")
+
+
 def synthesize_text(text: str, output_path: str, backend: Optional[str] = None) -> str:
     """
     Synthesize text to speech using configured backend
@@ -73,7 +94,7 @@ def synthesize_text(text: str, output_path: str, backend: Optional[str] = None) 
     Args:
         text: Text to synthesize
         output_path: Path to save audio file
-        backend: TTS backend to use ('gtts' or 'pyttsx3'), or None for config default
+        backend: TTS backend to use ('gtts', 'pyttsx3' or 'azure'), or None for config default
         
     Returns:
         Path to generated audio file
@@ -91,6 +112,8 @@ def synthesize_text(text: str, output_path: str, backend: Optional[str] = None) 
             synthesize_gtts(text, output_path)
         elif backend == "pyttsx3":
             synthesize_pyttsx3(text, output_path)
+        elif backend == "azure":
+            synthesize_azure(text, output_path)
         else:
             raise ValueError(f"Unknown TTS backend: {backend}")
         
@@ -101,21 +124,22 @@ def synthesize_text(text: str, output_path: str, backend: Optional[str] = None) 
         if Config.DEBUG:
             print(f"Primary TTS backend failed: {e}")
         
-        fallback = "pyttsx3" if backend == "gtts" else "gtts"
+        # Choose fallback order (prefer offline gTTS/pyttsx3)
+        fallbacks = [b for b in ["pyttsx3", "gtts"] if b != backend]
         
-        if Config.DEBUG:
-            print(f"Trying fallback TTS backend: {fallback}")
+        for fb in fallbacks:
+            try:
+                if fb == "gtts":
+                    synthesize_gtts(text, output_path)
+                else:
+                    synthesize_pyttsx3(text, output_path)
+                return output_path
+            except Exception:
+                if Config.DEBUG:
+                    print(f"Fallback {fb} failed")
+                continue
         
-        try:
-            if fallback == "gtts":
-                synthesize_gtts(text, output_path)
-            else:
-                synthesize_pyttsx3(text, output_path)
-            return output_path
-        except Exception as fallback_error:
-            raise RuntimeError(
-                f"Both TTS backends failed. Primary: {e}, Fallback: {fallback_error}"
-            ) from fallback_error
+        raise RuntimeError(f"All TTS backends failed. Primary error: {e}")
 
 
 def get_audio_bytes(audio_path: str) -> bytes:

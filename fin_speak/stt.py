@@ -1,6 +1,6 @@
 """
 Speech-to-Text (STT) module
-Handles audio transcription using Whisper or OpenAI API
+Handles audio transcription using local Whisper or Azure Speech
 """
 
 import os
@@ -47,79 +47,70 @@ def transcribe_local(audio_path: str) -> str:
         raise RuntimeError(f"Error transcribing audio with Whisper: {e}") from e
 
 
-def transcribe_openai(audio_path: str) -> str:
+def transcribe(audio_path: str) -> str:
     """
-    Transcribe audio using OpenAI Whisper API
+    Transcribe audio using the configured backend (priority: Azure -> Local)
     
     Args:
         audio_path: Path to audio file
-        
-    Returns:
-        Transcribed text
-    """
-    try:
-        from openai import OpenAI
-        
-        if not Config.OPENAI_API_KEY:
-            raise ValueError("OpenAI API key not found in configuration")
-        
-        client = OpenAI(api_key=Config.OPENAI_API_KEY)
-        
-        with open(audio_path, "rb") as audio_file:
-            transcript = client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file
-            )
-        
-        return transcript.text.strip()
-        
-    except ImportError as e:
-        raise ImportError(
-            "OpenAI library is not installed. Install with: pip install openai"
-        ) from e
-    except Exception as e:
-        raise RuntimeError(f"Error transcribing audio with OpenAI API: {e}") from e
-
-
-def transcribe(audio_path: str, force_local: bool = False) -> str:
-    """
-    Transcribe audio using the configured backend (local or OpenAI)
-    
-    Args:
-        audio_path: Path to audio file
-        force_local: Force use of local model even if OpenAI is configured
         
     Returns:
         Transcribed text
     """
     if not os.path.exists(audio_path):
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
-    
-    # Choose backend
-    use_openai = Config.use_openai_stt() and not force_local
-    
+
+    # Build backend priority list
+    backends = []
+    if Config.use_azure_speech():
+        backends.append('azure')
+    backends.append('local')
+
     if Config.DEBUG:
-        backend = "OpenAI API" if use_openai else "Local Whisper"
-        print(f"Using STT backend: {backend}")
-    
-    try:
-        if use_openai:
-            return transcribe_openai(audio_path)
-        else:
-            return transcribe_local(audio_path)
-    except Exception as e:
-        # Fallback to the other method if one fails
-        if use_openai:
+        print(f"STT backend priority: {backends}")
+
+    last_exc = None
+    for backend in backends:
+        try:
+            if backend == 'azure':
+                return transcribe_azure(audio_path)
+            if backend == 'local':
+                return transcribe_local(audio_path)
+        except Exception as e:
+            last_exc = e
             if Config.DEBUG:
-                print(f"OpenAI STT failed, falling back to local: {e}")
-            return transcribe_local(audio_path)
-        else:
-            if Config.use_openai_stt():
-                if Config.DEBUG:
-                    print(f"Local STT failed, falling back to OpenAI: {e}")
-                return transcribe_openai(audio_path)
-            else:
-                raise
+                print(f"Backend {backend} failed: {e}")
+            continue
+
+    # If we exhausted all backends, raise the last error
+    if last_exc:
+        raise last_exc
+    else:
+        raise RuntimeError("No STT backend available")
+
+
+def transcribe_azure(audio_path: str) -> str:
+    """
+    Transcribe audio using Azure Cognitive Services Speech SDK (from file)
+    """
+    try:
+        import azure.cognitiveservices.speech as speechsdk
+    except ImportError as e:
+        raise ImportError("Azure Speech SDK not installed. Install with: pip install azure-cognitiveservices-speech") from e
+
+    if not Config.AZURE_SPEECH_KEY or not Config.AZURE_SPEECH_REGION:
+        raise ValueError("Azure Speech credentials not found in configuration")
+
+    speech_config = speechsdk.SpeechConfig(subscription=Config.AZURE_SPEECH_KEY, region=Config.AZURE_SPEECH_REGION)
+    audio_config = speechsdk.audio.AudioConfig(filename=audio_path)
+    recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+
+    result = recognizer.recognize_once()
+
+    if result.reason == speechsdk.ResultReason.RecognizedSpeech:
+        return result.text.strip()
+    else:
+        raise RuntimeError(f"Azure STT failed: {result.reason}")
 
 
 def preprocess_audio(audio_path: str, output_path: Optional[str] = None) -> str:

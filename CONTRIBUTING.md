@@ -80,11 +80,7 @@ make run
 streamlit run fin_speak/app.py
 ```
 
-**Using Docker:**
-```bash
-make docker-build
-make docker-run
-```
+<!-- Docker instructions removed (Dockerfile deleted) -->
 
 ## Project Structure
 
@@ -101,7 +97,6 @@ FinSpeak/
 ├── tests/              # Test suite
 ├── notebooks/          # Jupyter notebooks
 ├── data/               # Sample data
-└── demo_assets/        # Demo audio files
 ```
 
 ## Adding New Features

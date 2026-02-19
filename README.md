@@ -34,14 +34,14 @@ A complete ML pipeline that enables voice-based queries for mutual fund NAVs and
 
 FinSpeak is a speech-driven investment Q&A assistant that allows users to query mutual fund information using voice or text. It leverages:
 
-- **Whisper** (OpenAI) for speech-to-text
+- **Whisper** for speech-to-text (local model)
 - **Rule-based NLP** for intent detection (get_nav, get_return, explain_change)
 - **Fuzzy matching** for fund name extraction
 - **CSV-based knowledge base** for fund data
 - **gTTS** for text-to-speech responses
 - **Streamlit** for an interactive web interface
 
-The system is designed to run locally with CPU-friendly models, with optional OpenAI API integration.
+The system is designed to run locally with CPU-friendly models, requiring no cloud API costs.
 
 ---
 
@@ -56,7 +56,7 @@ The system is designed to run locally with CPU-friendly models, with optional Op
            │
            ▼
     ┌──────────────┐
-    │  STT Module  │  ◄─── Whisper (local) or OpenAI API
+    │  STT Module  │  ◄─── Whisper (local) or Azure Speech
     │   (stt.py)   │
     └──────┬───────┘
            │ Transcript
@@ -97,7 +97,7 @@ The system is designed to run locally with CPU-friendly models, with optional Op
 - 📊 **Data Queries**: Real-time NAV lookup and return calculations
 - 🔊 **Voice Output**: Text-to-speech responses for accessibility
 - 🎨 **Interactive UI**: Clean Streamlit interface with example queries
-- 🔧 **Configurable**: Switch between local models and OpenAI APIs
+- 🔧 **Configurable**: Switch between local models and Azure Speech API
 - 🐳 **Dockerized**: Ready-to-deploy containerized application
 - 📓 **Notebooks**: Jupyter notebooks for exploration and evaluation
 - ✅ **Tested**: Comprehensive test suite with pytest
@@ -233,14 +233,10 @@ FinSpeak/
 │   ├── 01_stt_demo.ipynb   # STT demonstration
 │   └── 02_nlu_demo.ipynb   # NLU demonstration
 │
-├── demo_assets/            # Demo audio files
-│
 ├── requirements.txt        # Python dependencies
-├── Dockerfile              # Docker configuration
 ├── Makefile                # Build automation
 ├── .env.example            # Environment variables template
 ├── run_local.sh            # Local setup script
-├── demo_script.sh          # Demo script
 ├── LICENSE                 # MIT License
 ├── CONTRIBUTING.md         # Contribution guidelines
 └── README.md               # This file
@@ -255,12 +251,12 @@ Configuration is managed through environment variables and `fin_speak/config.py`
 ### Environment Variables (.env)
 
 ```bash
-# OpenAI API (optional)
-OPENAI_API_KEY=your_key_here
+# Azure Speech (optional)
+AZURE_SPEECH_KEY=
+AZURE_SPEECH_REGION=
+USE_AZURE_SPEECH=false
 
-# Model Selection
-USE_OPENAI_STT=false
-USE_OPENAI_NLU=false
+# Whisper Model Size
 WHISPER_MODEL_SIZE=small
 
 # Debug Mode
@@ -277,10 +273,9 @@ DEBUG=false
 - `large`: Best accuracy (~10GB RAM)
 
 **Backend Options**:
-- Local Whisper (CPU-friendly)
-- OpenAI Whisper API (requires API key)
+- Local Whisper (CPU-friendly, free) ⭐
+- Azure Speech (optional cloud deployment)
 - gTTS for speech synthesis
-- pyttsx3 as fallback TTS
 
 ---
 
@@ -337,54 +332,7 @@ xdg-open htmlcov/index.html  # Linux
 
 ---
 
-## 🐳 Docker
-
-### Build Image
-
-```bash
-make docker-build
-```
-
-Or:
-
-```bash
-docker build -t finspeak:latest .
-```
-
-### Run Container
-
-```bash
-make docker-run
-```
-
-Or:
-
-```bash
-docker run -p 8501:8501 finspeak:latest
-```
-
-Access at: **http://localhost:8501**
-
-### Docker Compose (Optional)
-
-Create `docker-compose.yml`:
-
-```yaml
-version: '3.8'
-services:
-  finspeak:
-    build: .
-    ports:
-      - "8501:8501"
-    environment:
-      - WHISPER_MODEL_SIZE=small
-    volumes:
-      - ./data:/app/data
-```
-
-Run with: `docker-compose up`
-
----
+<!-- Docker support removed from repository -->
 
 ## 📓 Notebooks
 
@@ -409,14 +357,14 @@ jupyter notebook notebooks/
 
 ## 🎬 Demo
 
-### Run Demo Script
+Start the Streamlit demo with the local setup script or using Streamlit directly:
 
 ```bash
-chmod +x demo_script.sh
-./demo_script.sh
+# Windows
+.\run_local.ps1
+# Or
+streamlit run fin_speak/app.py
 ```
-
-This launches the Streamlit app with example queries displayed.
 
 ### Demo Queries to Try
 
@@ -448,7 +396,7 @@ returns with 85%+ intent detection accuracy.
 
 - **No Production Audio Storage**: Audio files are processed in-memory or temporarily
 - **Local Processing**: Default configuration uses local models (no data sent to cloud)
-- **Optional Cloud APIs**: OpenAI integration is opt-in via environment variables
+- **No Cloud Dependencies**: All models run locally by default, with optional Azure integration
 - **Data Privacy**: Sample CSV data is synthetic; replace with real data for production
 - **API Key Security**: Store API keys in `.env` (not committed to git)
 
@@ -482,7 +430,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- **OpenAI Whisper**: State-of-the-art speech recognition
+FinSpeak uses Whisper (OpenAI's open-source model) running locally for accurate speech recognition without cloud API costs.
 - **Streamlit**: Rapid web app development
 - **gTTS**: Simple text-to-speech synthesis
 - **RapidFuzz**: Fast fuzzy string matching

@@ -5,21 +5,30 @@ Speech-driven Investment Q&A Assistant
 
 import os
 import tempfile
+import queue
 from typing import Optional, Dict
 
 import streamlit as st
+import numpy as np
 
-from .config import Config
-from .stt import transcribe, preprocess_audio
-from .nlp import detect_intent, extract_fund
-from .kb import (
+try:
+    from streamlit_webrtc import webrtc_streamer, WebRtcMode, AudioProcessorBase
+    import av
+    WEBRTC_AVAILABLE = True
+except ImportError:
+    WEBRTC_AVAILABLE = False
+
+from fin_speak.config import Config
+from fin_speak.stt import transcribe, preprocess_audio
+from fin_speak.nlp import detect_intent, extract_fund
+from fin_speak.kb import (
     match_fund,
     get_latest_nav,
     get_fund_info,
     compute_return,
     get_all_funds,
 )
-from .tts import synthesize_text, get_audio_bytes
+from fin_speak.tts import synthesize_text, get_audio_bytes
 
 
 def generate_answer(
@@ -124,16 +133,15 @@ def main():
         )
         Config.WHISPER_MODEL_SIZE = whisper_model
         
-        use_openai = st.checkbox(
-            "Use OpenAI API",
-            value=Config.use_openai_stt(),
-            help="Requires OPENAI_API_KEY in .env"
+        # Azure Speech option
+        use_azure = st.checkbox(
+            "Use Azure Speech",
+            value=Config.use_azure_speech(),
+            help="Requires AZURE_SPEECH_KEY and AZURE_SPEECH_REGION in .env"
         )
-        
-        if use_openai and not Config.OPENAI_API_KEY:
-            st.warning("⚠️ OpenAI API key not found in .env file")
-        
-        Config.USE_OPENAI_STT = use_openai
+        if use_azure and not (Config.AZURE_SPEECH_KEY and Config.AZURE_SPEECH_REGION):
+            st.warning("⚠️ Azure Speech credentials not found in .env file")
+        Config.USE_AZURE_SPEECH = use_azure
         
         st.divider()
         
@@ -167,24 +175,95 @@ def main():
         st.header("🎤 Input")
         
         # Input method tabs
-        input_tab1, input_tab2 = st.tabs(["📁 Upload Audio", "⌨️ Text Input"])
+        if WEBRTC_AVAILABLE:
+            input_tab1, input_tab2, input_tab3 = st.tabs(["🎤 Record Audio", "📁 Upload Audio", "⌨️ Text Input"])
+        else:
+            input_tab1, input_tab2 = st.tabs(["📁 Upload Audio", "⌨️ Text Input"])
+            input_tab3 = None
         
-        with input_tab1:
-            audio_file = st.file_uploader(
-                "Upload audio file (WAV or MP3)",
-                type=["wav", "mp3", "m4a"],
-                help="Upload an audio file with your question"
-            )
+        # Initialize session state for recorded audio
+        if 'recorded_audio' not in st.session_state:
+            st.session_state.recorded_audio = None
+        
+        audio_file = None
+        recorded_audio_data = None
+        
+        if WEBRTC_AVAILABLE:
+            with input_tab1:
+                st.markdown("**Record your question using your microphone**")
+                
+                # Audio processor class for capturing audio
+                class AudioProcessor(AudioProcessorBase):
+                    def __init__(self):
+                        self.audio_buffer = []
+                        self.sample_rate = 16000
+                    
+                    def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
+                        # Capture audio frames
+                        audio_array = frame.to_ndarray()
+                        self.audio_buffer.append(audio_array)
+                        return frame
+                
+                webrtc_ctx = webrtc_streamer(
+                    key="speech-to-text",
+                    mode=WebRtcMode.SENDONLY,
+                    audio_receiver_size=1024,
+                    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+                    media_stream_constraints={"video": False, "audio": True},
+                )
+                
+                if webrtc_ctx.audio_receiver:
+                    try:
+                        audio_frames = webrtc_ctx.audio_receiver.get_frames(timeout=1)
+                        if audio_frames:
+                            # Combine audio frames into single array
+                            audio_data = []
+                            for frame in audio_frames:
+                                audio_data.append(frame.to_ndarray())
+                            if audio_data:
+                                combined = np.concatenate(audio_data, axis=1)
+                                st.session_state.recorded_audio = combined
+                                st.success("✅ Audio recorded! Click 'Process Query' to transcribe.")
+                    except queue.Empty:
+                        pass
+                
+                if st.session_state.recorded_audio is not None:
+                    st.info("🎧 Audio recording captured. Ready to process.")
+                    recorded_audio_data = st.session_state.recorded_audio
             
-            if audio_file:
-                st.audio(audio_file, format="audio/wav")
-        
-        with input_tab2:
-            text_input = st.text_area(
-                "Or type your question",
-                placeholder="What is the current NAV of Vanguard S&P 500 Fund?",
-                help="Type your question as text"
-            )
+            with input_tab2:
+                audio_file = st.file_uploader(
+                    "Upload audio file (WAV or MP3)",
+                    type=["wav", "mp3", "m4a"],
+                    help="Upload an audio file with your question"
+                )
+                
+                if audio_file:
+                    st.audio(audio_file, format="audio/wav")
+            
+            with input_tab3:
+                text_input = st.text_area(
+                    "Or type your question",
+                    placeholder="What is the current NAV of Vanguard S&P 500 Fund?",
+                    help="Type your question as text"
+                )
+        else:
+            with input_tab1:
+                audio_file = st.file_uploader(
+                    "Upload audio file (WAV or MP3)",
+                    type=["wav", "mp3", "m4a"],
+                    help="Upload an audio file with your question"
+                )
+                
+                if audio_file:
+                    st.audio(audio_file, format="audio/wav")
+            
+            with input_tab2:
+                text_input = st.text_area(
+                    "Or type your question",
+                    placeholder="What is the current NAV of Vanguard S&P 500 Fund?",
+                    help="Type your question as text"
+                )
         
         # Process button
         process_button = st.button("🚀 Process Query", type="primary", use_container_width=True)
@@ -206,18 +285,33 @@ def main():
         
         # Get transcript
         with st.spinner("Processing..."):
+            tmp_path = None
             try:
-                if audio_file:
+                if recorded_audio_data is not None:
+                    # Save recorded audio to temp file
+                    import soundfile as sf
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+                        tmp_path = tmp_file.name
+                    # Flatten and save as mono
+                    audio_mono = recorded_audio_data.flatten() if recorded_audio_data.ndim > 1 else recorded_audio_data
+                    sf.write(tmp_path, audio_mono, Config.SAMPLE_RATE)
+                    
+                    st.info("🎧 Transcribing recorded audio...")
+                    transcript = transcribe(tmp_path)
+                    # Clear the recorded audio after processing
+                    st.session_state.recorded_audio = None
+                    
+                elif audio_file:
                     # Save uploaded file temporarily
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
                         tmp_file.write(audio_file.read())
                         tmp_path = tmp_file.name
                     
-                    st.info("🎧 Transcribing audio...")
-                    transcript = transcribe(tmp_path)
+                    # Preprocess audio to 16kHz mono
+                    processed_path = preprocess_audio(tmp_path)
                     
-                    # Cleanup
-                    os.unlink(tmp_path)
+                    st.info("🎧 Transcribing audio...")
+                    transcript = transcribe(processed_path)
                     
                 elif text_input:
                     transcript = text_input
@@ -230,6 +324,10 @@ def main():
                 if Config.DEBUG:
                     st.exception(e)
                 return
+            finally:
+                # Cleanup temp file
+                if tmp_path and os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
         
         # Display results
         if transcript:
@@ -365,9 +463,11 @@ def main():
                         
                         synthesize_text(answer, audio_path)
                         
-                        st.audio(audio_path, format="audio/mp3")
+                        # Read audio bytes before displaying to avoid file access issues
+                        audio_bytes = get_audio_bytes(audio_path)
+                        st.audio(audio_bytes, format="audio/mp3")
                         
-                        # Cleanup
+                        # Cleanup after reading bytes
                         if os.path.exists(audio_path):
                             os.unlink(audio_path)
                     
