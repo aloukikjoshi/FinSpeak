@@ -1,244 +1,230 @@
 """
-Natural Language Processing (NLP) module
-Handles intent detection and entity extraction
+NLP module - Intent detection and entity extraction
+Supports English, Hindi (Devanagari), and Hinglish (Hindi in Roman script)
 """
 
 import re
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Optional, Tuple
 
-from .config import Config
-
-
-# Intent categories
 INTENT_GET_NAV = "get_nav"
 INTENT_GET_RETURN = "get_return"
-INTENT_EXPLAIN_CHANGE = "explain_change"
+INTENT_EXPLAIN = "explain_term"
 INTENT_UNKNOWN = "unknown"
 
+# ── Hindi / Hinglish term-to-English mapping ──────────────────────────
+# Maps Devanagari and Romanised Hindi words to their English equivalents
+HINDI_TERM_MAP = {
+    # Devanagari
+    "एनएवी": "nav", "एन ए वी": "nav",
+    "एसआईपी": "sip", "एस आई पी": "sip",
+    "रिटर्न": "returns", "रिटर्न्स": "returns",
+    "म्यूचुअल फंड": "mutual fund", "म्युचुअल फंड": "mutual fund",
+    "एक्सपेंस रेशियो": "expense ratio",
+    "ईएलएसएस": "elss",
+    "लार्ज कैप": "large cap", "लार्ज़ कैप": "large cap",
+    "स्मॉल कैप": "small cap",
+    "सीएजीआर": "cagr",
+    "एक्जिट लोड": "exit load",
+    "एयूएम": "aum",
+    # Romanised Hindi (Hinglish)
+    "kya hai": "", "kya hota hai": "", "kya hoti hai": "",
+    "matlab": "", "matlab kya hai": "",
+    "samjhao": "", "samjhaiye": "", "batao": "", "bataiye": "",
+}
 
-def detect_intent_rule_based(transcript: str) -> Dict[str, any]:
+# Words that signal "explain this term" intent in any language
+EXPLAIN_SIGNALS_HI = [
+    r"क्या\s*(है|होता|होती|हैं|होते)",       # क्या है / क्या होता है
+    r"(मतलब|अर्थ|meaning)",                   # मतलब / अर्थ
+    r"(समझाओ|समझाइए|बताओ|बताइए)",             # समझाओ / बताओ
+]
+EXPLAIN_SIGNALS_HINGLISH = [
+    r"\b(kya\s+h[ao]i|kya\s+hota?\s+h[ao]i)\b",
+    r"\b(matlab|meaning|samjh[ao]|bata[oi])\b",
+    r"\b(explain|define)\b",
+]
+EXPLAIN_SIGNALS_EN = [
+    r"\b(what\s+is|what\s+are|explain|define|meaning\s+of|tell\s+me\s+about)\b",
+    r"\b(what\s+does)\b.*\b(mean)\b",
+]
+
+
+def _has_devanagari(text: str) -> bool:
+    """Check if text contains Devanagari characters"""
+    return bool(re.search(r'[\u0900-\u097F]', text))
+
+
+def _normalise(text: str) -> str:
+    """Light normalisation: lowercase, collapse whitespace"""
+    return re.sub(r'\s+', ' ', text.strip().lower())
+
+
+def detect_intent_rule_based(text: str) -> Dict:
     """
-    Detect intent using rule-based approach
-    
-    Args:
-        transcript: Transcribed text
-        
-    Returns:
-        Dictionary with intent, confidence, and extracted info
+    Detect intent using pattern matching.
+    Supports English, Hindi (Devanagari), and Hinglish.
     """
-    transcript_lower = transcript.lower()
-    
-    # Patterns for different intents
+    text_lower = _normalise(text)
+    is_hindi = _has_devanagari(text)
+
+    # ── Known fund house names → indicates a FUND query, not explain ──
+    fund_house_hints = [
+        'hdfc', 'sbi', 'icici', 'axis', 'kotak', 'nippon', 'tata',
+        'birla', 'aditya', 'dsp', 'franklin', 'mirae', 'parag',
+        'uti', 'canara', 'idfc', 'sundaram', 'motilal', 'edelweiss',
+        'bandhan', 'pgim', 'invesco', 'quant', 'baroda', 'hsbc',
+        'mahindra', 'union', 'lic', 'ppfas', 'quantum',
+    ]
+    has_fund_hint = any(fh in text_lower for fh in fund_house_hints)
+
+    # ── 1. NAV intent ─────────────────────────────────────────────
     nav_patterns = [
+        # English
         r'\b(what|current|latest|today)\b.*\b(nav|price|value)\b',
         r'\bnav\b.*\bof\b',
         r'\bprice\b.*\bof\b',
         r'\bcurrent\s+value\b',
+        # Hindi / Hinglish
+        r'(एनएवी|nav)\s*(बताओ|batao|dikhao|दिखाओ)',
+        r'\b(nav|price|value)\b.*(batao|dikhao|bataiye)\b',
+        r'\b(kitna|kitni)\b.*\b(nav|price|value)\b',
     ]
-    
+
+    # ── 2. RETURNS intent ─────────────────────────────────────────
     return_patterns = [
+        # English
         r'\b(return|returns|performance|gain|growth)\b',
         r'\bhow\s+(much|well)\b.*\b(perform|doing|grown)\b',
-        r'\b(profit|loss)\b',
-        r'\b(\d+)\s*(month|year|day)\b.*\b(return|performance)\b',
-        r'\breturn\b.*\b(over|in|for)\b.*\b(month|year)\b',
+        r'\b(\d+)\s*(month|year)\b.*\b(return|performance)\b',
+        # Hindi / Hinglish
+        r'(रिटर्न|return)\s*(बताओ|दिखाओ|कितना|kitna)',
+        r'\b(return|returns|performance)\b.*(batao|dikhao)\b',
+        r'\b(kitna|kitni)\b.*(return|badha|growth)\b',
     ]
-    
-    explain_patterns = [
-        r'\bwhy\b.*\b(change|increase|decrease|drop|rise)\b',
-        r'\bexplain\b.*\b(performance|change)\b',
-        r'\breason\b.*\b(for)\b',
-    ]
-    
-    # Check patterns
+
     intent = INTENT_UNKNOWN
-    confidence = 0.5
-    
+
     for pattern in nav_patterns:
-        if re.search(pattern, transcript_lower):
+        if re.search(pattern, text_lower):
             intent = INTENT_GET_NAV
-            confidence = 0.9
             break
-    
+
     if intent == INTENT_UNKNOWN:
         for pattern in return_patterns:
-            if re.search(pattern, transcript_lower):
+            if re.search(pattern, text_lower):
                 intent = INTENT_GET_RETURN
-                confidence = 0.85
                 break
-    
-    if intent == INTENT_UNKNOWN:
-        for pattern in explain_patterns:
-            if re.search(pattern, transcript_lower):
-                intent = INTENT_EXPLAIN_CHANGE
-                confidence = 0.8
-                break
-    
-    # Extract time period if present
-    period_months = extract_time_period(transcript)
-    
+
+    # ── 3. If we found a fund intent OR a fund house hint, return fund query ─
+    if intent != INTENT_UNKNOWN or has_fund_hint:
+        if intent == INTENT_UNKNOWN and has_fund_hint:
+            intent = INTENT_GET_NAV  # default fund queries to NAV
+        period_months = extract_time_period(text)
+        return {
+            "intent": intent,
+            "period_months": period_months,
+        }
+
+    # ── 4. Check for EXPLAIN intent (only if no fund context) ─────
+    explain_patterns = (
+        EXPLAIN_SIGNALS_HI + EXPLAIN_SIGNALS_HINGLISH
+        if is_hindi else
+        EXPLAIN_SIGNALS_EN + EXPLAIN_SIGNALS_HINGLISH
+    )
+    for pat in explain_patterns:
+        if re.search(pat, text_lower):
+            term = _extract_term_to_explain(text_lower, is_hindi)
+            return {
+                "intent": INTENT_EXPLAIN,
+                "term": term,
+                "period_months": None,
+            }
+
+    period_months = extract_time_period(text)
+
     return {
         "intent": intent,
-        "confidence": confidence,
         "period_months": period_months,
-        "method": "rule_based"
     }
 
 
+def _extract_term_to_explain(text: str, is_hindi: bool) -> str:
+    """Pull the financial term out of an explain-type query"""
+    cleaned = text
+
+    # Strip Devanagari question markers
+    for pat in EXPLAIN_SIGNALS_HI:
+        cleaned = re.sub(pat, '', cleaned)
+    # Strip Hinglish / English question markers
+    for pat in EXPLAIN_SIGNALS_HINGLISH + EXPLAIN_SIGNALS_EN:
+        cleaned = re.sub(pat, '', cleaned)
+
+    # Remove punctuation (keep Devanagari + Latin)
+    cleaned = re.sub(r'[^\w\s\u0900-\u097F]', '', cleaned)
+    cleaned = cleaned.strip()
+
+    # Map known Hindi/Hinglish terms to English keys
+    for hindi, eng in HINDI_TERM_MAP.items():
+        if hindi in cleaned:
+            if eng:
+                return eng
+            cleaned = cleaned.replace(hindi, '').strip()
+
+    return cleaned if cleaned else text
+
+
 def extract_time_period(text: str) -> Optional[int]:
-    """
-    Extract time period in months from text
-    
-    Args:
-        text: Input text
-        
-    Returns:
-        Number of months or None
-    """
-    text_lower = text.lower()
-    
-    # Look for explicit month mentions
-    month_match = re.search(r'(\d+)\s*month', text_lower)
+    """Extract time period in months from text (EN + Hindi + Hinglish)"""
+    text_lower = _normalise(text)
+
+    month_match = re.search(r'(\d+)\s*(month|mahine|महीने|mahin[ae])', text_lower)
     if month_match:
         return int(month_match.group(1))
-    
-    # Look for year mentions
-    year_match = re.search(r'(\d+)\s*year', text_lower)
+
+    year_match = re.search(r'(\d+)\s*(year|saal|साल)', text_lower)
     if year_match:
         return int(year_match.group(1)) * 12
-    
-    # Common phrases
-    if 'one year' in text_lower or '1 year' in text_lower:
+
+    if any(w in text_lower for w in ['one year', 'ek saal', 'एक साल']):
         return 12
-    if 'six month' in text_lower or '6 month' in text_lower:
+    if any(w in text_lower for w in ['six month', 'cheh mahine', 'छह महीने']):
         return 6
-    if 'three month' in text_lower or '3 month' in text_lower:
+    if any(w in text_lower for w in ['three month', 'teen mahine', 'तीन महीने']):
         return 3
-    
-    # Default to 12 months for return queries
-    if any(word in text_lower for word in ['return', 'performance', 'gain']):
-        return 12
-    
+
+    return 12  # Default
+
+
+def extract_fund(text: str) -> Optional[str]:
+    """Extract fund name from text (EN + Hindi + Hinglish)"""
+    text_lower = _normalise(text)
+
+    # Remove common query words (English + Hinglish + Hindi)
+    stop_words = [
+        # English
+        'what', 'is', 'the', 'nav', 'of', 'current', 'value', 'price',
+        'show', 'me', 'tell', 'about', 'get', 'returns', 'return',
+        'performance', 'how', 'much', 'fund', 'mutual', 'month', 'year',
+        'latest', 'today', 'give', 'please',
+        # Hinglish
+        'kya', 'hai', 'ka', 'ki', 'ke', 'batao', 'bataiye', 'dikhao',
+        'kitna', 'kitni', 'kitne', 'abhi', 'aaj', 'mujhe',
+    ]
+
+    # Strip Devanagari question words
+    text_clean = re.sub(
+        r'(क्या|है|का|की|के|बताओ|बताइए|दिखाओ|कितना|कितनी|आज|अभी|मुझे)', '', text_lower
+    )
+
+    # Remove numbers and punctuation
+    text_clean = re.sub(r'\d+', '', text_clean)
+    text_clean = re.sub(r'[^\w\s]', '', text_clean)
+
+    # Split and filter
+    words = text_clean.split()
+    fund_words = [w for w in words if w not in stop_words and len(w) > 1]
+
+    if fund_words:
+        return ' '.join(fund_words)
+
     return None
-
-
-def detect_intent_ml(transcript: str) -> Dict[str, any]:
-    """
-    Detect intent using ML model (transformers)
-    
-    Args:
-        transcript: Transcribed text
-        
-    Returns:
-        Dictionary with intent and confidence
-    """
-    try:
-        from transformers import pipeline
-        
-        # Use zero-shot classification with configured model
-        classifier = pipeline(
-            "zero-shot-classification",
-            model=Config.NLU_MODEL
-        )
-        
-        candidate_labels = [
-            "get net asset value",
-            "get return performance",
-            "explain price change",
-            "other question"
-        ]
-        
-        result = classifier(transcript, candidate_labels)
-        
-        # Map to our intent types
-        label_map = {
-            "get net asset value": INTENT_GET_NAV,
-            "get return performance": INTENT_GET_RETURN,
-            "explain price change": INTENT_EXPLAIN_CHANGE,
-            "other question": INTENT_UNKNOWN
-        }
-        
-        top_label = result['labels'][0]
-        intent = label_map.get(top_label, INTENT_UNKNOWN)
-        confidence = result['scores'][0]
-        
-        return {
-            "intent": intent,
-            "confidence": confidence,
-            "period_months": extract_time_period(transcript),
-            "method": "ml"
-        }
-        
-    except Exception as e:
-        if Config.DEBUG:
-            print(f"ML intent detection failed: {e}")
-        # Fallback to rule-based
-        return detect_intent_rule_based(transcript)
-
-
-def detect_intent(transcript: str) -> Dict[str, any]:
-    """
-    Detect intent using configured method
-    
-    Args:
-        transcript: Transcribed text
-        
-    Returns:
-        Dictionary with intent, confidence, and metadata
-    """
-    if Config.USE_RULE_BASED_NLU:
-        return detect_intent_rule_based(transcript)
-    else:
-        return detect_intent_ml(transcript)
-
-
-def extract_fund(transcript: str, fund_names: Optional[List[str]] = None) -> Tuple[Optional[str], float]:
-    """
-    Extract fund name from transcript using fuzzy matching
-    
-    Args:
-        transcript: Transcribed text
-        fund_names: List of fund names to match against (optional)
-        
-    Returns:
-        Tuple of (matched_fund_name, confidence)
-    """
-    try:
-        from rapidfuzz import fuzz, process
-        
-        if fund_names is None:
-            # Load from KB
-            from .kb import load_funds_data
-            df = load_funds_data()
-            fund_names = df['fund_name'].tolist()
-        
-        # Find best match
-        result = process.extractOne(
-            transcript,
-            fund_names,
-            scorer=fuzz.token_set_ratio
-        )
-        
-        if result:
-            matched_name, score, _ = result
-            if score >= Config.FUZZY_MATCH_THRESHOLD:
-                return matched_name, score / 100.0
-        
-        return None, 0.0
-        
-    except ImportError as e:
-        if Config.DEBUG:
-            print(f"Fuzzy matching not available: {e}")
-        
-        # Simple substring matching fallback
-        if fund_names is None:
-            from .kb import load_funds_data
-            df = load_funds_data()
-            fund_names = df['fund_name'].tolist()
-        
-        transcript_lower = transcript.lower()
-        for name in fund_names:
-            if name.lower() in transcript_lower:
-                return name, 0.8
-        
-        return None, 0.0

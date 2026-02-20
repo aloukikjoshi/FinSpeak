@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinSpeak - Voice Investment Assistant</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231a1a2e'/%3E%3Ctext y='.9em' font-size='80' x='10'%3E%F0%9F%8E%99%EF%B8%8F%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎙️ FinSpeak</h1>
+            <p>Voice-Powered Mutual Fund Assistant</p>
+            <div class="lang-selector">
+                <label for="langSelect">🌐</label>
+                <select id="langSelect">
+                    <option value="en-IN">English</option>
+                    <option value="hi-IN">हिन्दी (Hindi)</option>
+                    <option value="hinglish">Hinglish</option>
+                </select>
+            </div>
+        </header>
+
+        <main>
+            <div class="query-section">
+                <div class="input-group">
+                    <input type="text" id="queryInput" placeholder="Ask about any mutual fund..." autocomplete="off">
+                    <button id="submitBtn" class="btn primary">Ask</button>
+                </div>
+                
+                <div class="voice-controls">
+                    <button id="micBtn" class="btn mic-btn" title="Click to speak">
+                        <span class="mic-icon">🎤</span>
+                        <span class="mic-text">Tap to Speak</span>
+                    </button>
+                    <div id="listeningIndicator" class="listening-indicator hidden">
+                        <span class="pulse"></span> Listening...
+                    </div>
+                </div>
+            </div>
+
+            <div class="response-section">
+                <div id="responseCard" class="response-card hidden">
+                    <div class="response-header">
+                        <span id="intentBadge" class="badge"></span>
+                        <button id="speakBtn" class="btn speak-btn" title="Read aloud (Azure Neural Voice)">🔊</button>
+                    </div>
+                    <p id="answerText" class="answer-text"></p>
+                    <div id="dataDetails" class="data-details"></div>
+                </div>
+                
+                <div id="errorCard" class="error-card hidden">
+                    <p id="errorText"></p>
+                </div>
+                
+                <div id="loadingCard" class="loading-card hidden">
+                    <div class="spinner"></div>
+                    <p>Fetching real-time data...</p>
+                </div>
+            </div>
+
+            <div class="examples-section">
+                <h3>Try asking:</h3>
+                <div class="examples">
+                    <button class="example-btn" data-query="What is the NAV of HDFC Equity Fund?">NAV of HDFC Equity</button>
+                    <button class="example-btn" data-query="Show me 6 month returns of SBI Blue Chip Fund">SBI Blue Chip Returns</button>
+                    <button class="example-btn" data-query="Current value of Axis Long Term Equity Fund">Axis Fund Value</button>
+                    <button class="example-btn" data-query="ICICI Technology Fund performance">ICICI Tech Performance</button>
+                </div>
+            </div>
+
+            <div class="learn-section">
+                <h3>📚 Learn Mode - Understand Finance</h3>
+                <p class="learn-subtitle">Don't know what a term means? Ask here! (English + Hindi + Hinglish)</p>
+                <div class="input-group">
+                    <input type="text" id="learnInput" placeholder="Type a term: NAV, SIP, एसआईपी, SIP kya hai...">
+                    <button id="learnBtn" class="btn learn-btn">Explain</button>
+                    <button id="learnMicBtn" class="btn mic-btn" title="Ask by voice">
+                        <span class="mic-icon">🎤</span>
+                    </button>
+                </div>
+                <div id="learnListeningIndicator" class="listening-indicator hidden">
+                    <span class="pulse"></span> Listening for a term...
+                </div>
+                <div class="learn-chips">
+                    <button class="chip" data-term="NAV">NAV</button>
+                    <button class="chip" data-term="SIP">SIP</button>
+                    <button class="chip" data-term="Returns">Returns</button>
+                    <button class="chip" data-term="Mutual Fund">Mutual Fund</button>
+                    <button class="chip" data-term="Expense Ratio">Expense Ratio</button>
+                    <button class="chip" data-term="ELSS">ELSS</button>
+                    <button class="chip" data-term="Large Cap">Large Cap</button>
+                    <button class="chip" data-term="Small Cap">Small Cap</button>
+                    <button class="chip" data-term="CAGR">CAGR</button>
+                    <button class="chip" data-term="Exit Load">Exit Load</button>
+                    <button class="chip" data-term="AUM">AUM</button>
+                </div>
+                <div id="learnCard" class="learn-card hidden">
+                    <div class="learn-card-header">
+                        <span id="learnTerm" class="learn-term"></span>
+                        <button id="learnSpeakBtn" class="btn speak-btn" title="Read aloud">🔊</button>
+                    </div>
+                    <p id="learnText" class="learn-text"></p>
+                    <span id="learnSource" class="learn-source"></span>
+                </div>
+            </div>
+
+            <div class="search-section">
+                <h3>🔍 Search Funds</h3>
+                <div class="input-group">
+                    <input type="text" id="searchInput" placeholder="Search mutual funds...">
+                    <button id="searchBtn" class="btn">Search</button>
+                </div>
+                <div id="searchResults" class="search-results hidden"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Real-time data from MFAPI.in | Neural Voice by Azure | Education by Groq AI</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

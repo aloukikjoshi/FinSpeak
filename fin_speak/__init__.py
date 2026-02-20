@@ -1,27 +1,23 @@
 """
-FinSpeak - Speech-driven Investment Q&A Assistant
-A complete ML pipeline for voice-based financial queries.
+FinSpeak - Voice-powered Mutual Fund Assistant
+Real-time data with FastAPI backend for Vercel deployment
 """
 
-__version__ = "1.0.0"
-__author__ = "FinSpeak Team"
+__version__ = "2.0.0"
 
 from .config import Config
-from .stt import transcribe
-from .nlp import detect_intent, extract_fund
-from .kb import match_fund, compute_return, search_funds, get_all_funds
-from .tts import synthesize_text
-from .app import generate_answer
+from .nlp import detect_intent_rule_based, extract_fund
+from .kb import query_nav, query_returns, search_fund
+from .data_service import get_fund_nav, get_fund_returns, search_funds
 
 __all__ = [
     "Config",
-    "transcribe",
-    "detect_intent",
+    "detect_intent_rule_based",
     "extract_fund",
-    "match_fund",
-    "compute_return",
+    "query_nav",
+    "query_returns",
+    "search_fund",
+    "get_fund_nav",
+    "get_fund_returns",
     "search_funds",
-    "get_all_funds",
-    "synthesize_text",
-    "generate_answer",
 ]

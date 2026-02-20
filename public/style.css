@@ -1,0 +1,466 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #fff;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    padding: 30px 0;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+}
+
+header p {
+    color: #8892b0;
+    font-size: 1.1rem;
+}
+
+.query-section {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+}
+
+.input-group {
+    display: flex;
+    gap: 12px;
+}
+
+input[type="text"] {
+    flex: 1;
+    padding: 14px 18px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+input[type="text"]:focus {
+    outline: none;
+    border-color: #64ffda;
+}
+
+input[type="text"]::placeholder {
+    color: #8892b0;
+}
+
+.btn {
+    padding: 14px 24px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn.primary {
+    background: linear-gradient(135deg, #64ffda 0%, #00bfa5 100%);
+    color: #1a1a2e;
+}
+
+.btn.primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(100, 255, 218, 0.3);
+}
+
+.voice-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.mic-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(100, 255, 218, 0.1);
+    border: 2px solid #64ffda;
+    color: #64ffda;
+    padding: 16px 32px;
+    border-radius: 50px;
+}
+
+.mic-btn:hover {
+    background: rgba(100, 255, 218, 0.2);
+}
+
+.mic-btn.listening {
+    background: #ff6b6b;
+    border-color: #ff6b6b;
+    color: #fff;
+    animation: pulse-btn 1s infinite;
+}
+
+@keyframes pulse-btn {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.mic-icon {
+    font-size: 1.3rem;
+}
+
+.listening-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ff6b6b;
+    font-weight: 600;
+}
+
+.listening-indicator .pulse {
+    width: 12px;
+    height: 12px;
+    background: #ff6b6b;
+    border-radius: 50%;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+.hidden {
+    display: none !important;
+}
+
+.response-section {
+    margin-bottom: 24px;
+}
+
+.response-card, .error-card, .loading-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 24px;
+}
+
+.response-card {
+    border: 1px solid rgba(100, 255, 218, 0.3);
+}
+
+.response-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge.nav {
+    background: rgba(100, 255, 218, 0.2);
+    color: #64ffda;
+}
+
+.badge.returns {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+}
+
+.speak-btn {
+    background: transparent;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    padding: 8px 16px;
+    font-size: 1.2rem;
+}
+
+.speak-btn:hover {
+    border-color: #64ffda;
+}
+
+.answer-text {
+    font-size: 1.25rem;
+    line-height: 1.6;
+    margin-bottom: 16px;
+}
+
+.data-details {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-size: 0.9rem;
+    color: #8892b0;
+}
+
+.data-details p {
+    margin: 6px 0;
+}
+
+.data-details .label {
+    color: #64ffda;
+}
+
+.error-card {
+    border: 1px solid rgba(255, 107, 107, 0.3);
+    color: #ff6b6b;
+}
+
+.loading-card {
+    text-align: center;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(100, 255, 218, 0.2);
+    border-top-color: #64ffda;
+    border-radius: 50%;
+    margin: 0 auto 16px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.examples-section {
+    margin-bottom: 24px;
+}
+
+.examples-section h3 {
+    color: #8892b0;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+}
+
+.examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.example-btn {
+    padding: 10px 18px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 25px;
+    color: #8892b0;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.example-btn:hover {
+    background: rgba(100, 255, 218, 0.1);
+    border-color: #64ffda;
+    color: #64ffda;
+}
+
+.search-section {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.search-section h3 {
+    margin-bottom: 16px;
+    color: #8892b0;
+}
+
+.search-results {
+    margin-top: 16px;
+}
+
+.search-results ul {
+    list-style: none;
+}
+
+.search-results li {
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.search-results li:hover {
+    background: rgba(100, 255, 218, 0.1);
+}
+
+.search-results .fund-code {
+    color: #64ffda;
+    font-size: 0.85rem;
+}
+
+.search-results .fund-name {
+    color: #fff;
+    margin-top: 4px;
+}
+
+footer {
+    text-align: center;
+    padding: 20px;
+    color: #8892b0;
+    font-size: 0.85rem;
+}
+
+/* Language Selector */
+.lang-selector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.lang-selector label {
+    font-size: 1.2rem;
+}
+
+.lang-selector select {
+    padding: 8px 16px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.lang-selector select:focus {
+    outline: none;
+    border-color: #64ffda;
+}
+
+.lang-selector select option {
+    background: #1a1a2e;
+    color: #fff;
+}
+
+/* Learn Mode */
+.learn-section {
+    background: rgba(255, 193, 7, 0.05);
+    border: 1px solid rgba(255, 193, 7, 0.15);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.learn-section h3 {
+    color: #ffc107;
+    margin-bottom: 8px;
+}
+
+.learn-subtitle {
+    color: #8892b0;
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+}
+
+.learn-btn {
+    background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+    color: #1a1a2e;
+}
+
+.learn-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(255, 193, 7, 0.3);
+}
+
+.learn-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 16px 0;
+}
+
+.chip {
+    padding: 8px 16px;
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: 20px;
+    color: #ffc107;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.chip:hover {
+    background: rgba(255, 193, 7, 0.25);
+    transform: translateY(-1px);
+}
+
+.learn-card {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 16px;
+    border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.learn-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.learn-term {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #ffc107;
+}
+
+.learn-text {
+    font-size: 1.05rem;
+    line-height: 1.7;
+    color: #ccd6f6;
+}
+
+.learn-source {
+    display: inline-block;
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: #8892b0;
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+}
+
+@media (max-width: 600px) {
+    .input-group {
+        flex-direction: column;
+    }
+    
+    .examples, .learn-chips {
+        flex-direction: column;
+    }
+    
+    header h1 {
+        font-size: 1.8rem;
+    }
+}
